@@ -13,7 +13,8 @@ class TestExif(unittest.TestCase):
 
     def test_get_dirname(self):
         file_date = main.get_date("static/exif.jpg")
-        dirname = main.get_dirname(file_date, "output")
+        creation_date = datetime.datetime.fromtimestamp(os.path.getmtime("static/exif.jpg"))
+        dirname = main.get_dirname(file_date, "output", creation_date)
         assert dirname == "output/{}-{}".format(
             str(file_date.year),
             str(file_date.month).zfill(2)
@@ -27,7 +28,8 @@ class TestExif(unittest.TestCase):
         file_extension = os.path.splitext("static/exif.jpg")[1]
         file_date = main.get_date("static/exif.jpg")
         file_hash = main.get_hash("static/exif.jpg")
-        file_name = main.get_filename(file_date, file_hash, file_extension)
+        creation_date = datetime.datetime.fromtimestamp(os.path.getmtime("static/exif.jpg"))
+        file_name = main.get_filename(file_date, file_hash, file_extension, creation_date)
         assert file_name == "{}-{}{}".format(
             file_date.isoformat(),
             file_hash,
@@ -37,16 +39,15 @@ class TestExif(unittest.TestCase):
 
 class TestNonExif(unittest.TestCase):
 
-    def test_get_date(self):
-        file_date = main.get_date("static/urandom.jpg")
-        assert type(file_date) == datetime.datetime
 
     def test_get_dirname(self):
         file_date = main.get_date("static/urandom.jpg")
-        dirname = main.get_dirname(file_date, "output")
-        assert dirname == "output/{}-{}".format(
-            str(file_date.year),
-            str(file_date.month).zfill(2)
+        creation_date = datetime.datetime.fromtimestamp(os.path.getmtime("static/urandom.jpg"))
+        dirname = main.get_dirname(file_date, "output", creation_date)
+        print(creation_date.year)
+        assert dirname == "output/no-metadata/{}-{}".format(
+            str(creation_date.year),
+            str(creation_date.month).zfill(2)
         )
 
     def test_get_hash(self):
@@ -57,9 +58,12 @@ class TestNonExif(unittest.TestCase):
         file_extension = os.path.splitext("static/urandom.jpg")[1]
         file_date = main.get_date("static/urandom.jpg")
         file_hash = main.get_hash("static/urandom.jpg")
-        file_name = main.get_filename(file_date, file_hash, file_extension)
-        assert file_name == "{}-{}{}".format(
-            file_date.isoformat(),
+        creation_date = datetime.datetime.fromtimestamp(os.path.getmtime("static/urandom.jpg"))
+        file_name = main.get_filename(file_date, file_hash, file_extension, creation_date)
+        assert file_name == "{}-{}-{}-{}{}".format(
+            str(creation_date.year),
+            str(creation_date.month).zfill(2),
+            str(creation_date.day).zfill(2),
             file_hash,
             file_extension
         )

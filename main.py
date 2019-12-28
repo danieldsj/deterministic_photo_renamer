@@ -9,6 +9,10 @@ import hashlib
 import shutil
 from datetime import datetime
 
+# Larger files are not processed out of the box. Ths works around the issue.
+Image.MAX_IMAGE_PIXELS = 999999999
+Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+
 # Setup logging.
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -26,41 +30,32 @@ def get_date(file_path):
     log.info("Getting EXIF data.")
     try:
         image = Image.open(file_path)
-        exif = dict(image.getexif())
+    except Exception as e:
+        log.info("Could not open file as image. Error: {}".format(e))
+        return None
+    
+    
+    exif = dict(image.getexif())
 
-        try:
-            return datetime.strptime(exif.get(306), "%Y:%m:%d %H:%M:%S")
-            log.info("Using EXIF DateTime data for file: {}".format(file_path))
-        except TypeError as e:
-            log.warning("Failed to get EXIF DateTime data. Error: {}".format(e))
+    try:
+        return datetime.strptime(exif.get(306), "%Y:%m:%d %H:%M:%S")
+        log.info("Using EXIF DateTime data for file: {}".format(file_path))
+    except Exception as e:
+        log.warning("Failed to get EXIF DateTime data. Error: {}".format(e))
 
-        try:
-            return datetime.strptime(exif.get(36867), "%Y:%m:%d %H:%M:%S")
-            log.info("Using EXIF DateTimeOriginal data for file: {}".format(file_path))
-        except TypeError as e:
-            log.warning("Failed to get EXIF DateTimeOriginal data. Error: {}".format(e))
+    try:
+        return datetime.strptime(exif.get(36867), "%Y:%m:%d %H:%M:%S")
+        log.info("Using EXIF DateTimeOriginal data for file: {}".format(file_path))
+    except Exception as e:
+        log.warning("Failed to get EXIF DateTimeOriginal data. Error: {}".format(e))
 
-        try:
-            return datetime.strptime(exif.get(36868), "%Y:%m:%d %H:%M:%S")
-            log.info("Using EXIF DateTimeDigitized data for file: {}".format(file_path))
-        except TypeError as e:
-            log.warning("Failed to get EXIF DateTimeDigitized data. Error: {}".format(e))
+    try:
+        return datetime.strptime(exif.get(36868), "%Y:%m:%d %H:%M:%S")
+        log.info("Using EXIF DateTimeDigitized data for file: {}".format(file_path))
+    except Exception as e:
+        log.warning("Failed to get EXIF DateTimeDigitized data. Error: {}".format(e))
 
-        try:
-            return datetime.fromtimestamp(os.path.getctime(file_path))
-            log.info("Using file creation time for file: {}".format(file_path))
-        except Exception as e:
-            log.error("Failed to get file creation time. Error: {}".format(e))
-            raise e
-
-    except OSError as e:
-        log.warning("The file {} does not appear to be a valid image file.".format(file_path))
-        try:
-            return datetime.fromtimestamp(os.path.getctime(file_path))
-            log.info("Got creation time {} for file: {}".format(file_date, file_path))
-        except Exception as e:
-            log.error("Failed to get file creation time.")
-            raise e
+    return None
 
 def get_hash(file_path):
     log.info("Getting a file hash.")
@@ -74,18 +69,25 @@ def get_hash(file_path):
     log.info("Calculated hash of {} for file {}".format(file_hash, file_path))
     return file_hash
 
-def get_filename(file_date, file_hash, file_extension):
-    return "{}-{}{}".format(file_date.isoformat(), file_hash, file_extension)
+def get_filename(file_date, file_hash, file_extension, modified_date):
+    if file_date:
+        return "{}-{}{}".format(file_date.isoformat(), file_hash, file_extension)
+    else:
+        return "{}-{}-{}-{}{}".format(
+            str(modified_date.year),
+            str(modified_date.month).zfill(2),
+            str(modified_date.day).zfill(2), 
+            file_hash, 
+            file_extension)
 
-def get_dirname(file_date, output_dir):
-    return "{}/{}-{}".format(output_dir, str(file_date.year), str(file_date.month).zfill(2))
+def get_dirname(file_date, output_dir, modified_date):
+    if file_date:
+        return "{}/{}-{}".format(output_dir, str(file_date.year), str(file_date.month).zfill(2))
+    else:
+        return "{}/no-metadata/{}-{}".format(output_dir, str(modified_date.year), str(modified_date.month).zfill(2))
 
 def is_directory_valid(directory):
-    log.info('Validating input_dir argument.')
-    if os.path.isdir(directory):
-        return True
-    else:
-        return False
+    return os.path.isdir(directory)
 
 if __name__ == "__main__":
     log.info("Parsing arguments.")
@@ -116,16 +118,17 @@ if __name__ == "__main__":
         for f in files:
             file_path = os.path.join(root, f)
             log.info("Processing file: {}".format(file_path))
-            file_extension = os.path.splitext(f)[1]
+            file_extension = os.path.splitext(f)[1].lower()
+            modified_date = datetime.fromtimestamp(os.path.getmtime(file_path))
             file_date = get_date(file_path)
             file_hash = get_hash(file_path)
-            destination_dir = get_dirname(file_date, output_dir)
-            destination_file_name = get_filename(file_date, file_hash, file_extension)
+            destination_dir = get_dirname(file_date, output_dir, modified_date)
+            destination_file_name = get_filename(file_date, file_hash, file_extension, modified_date)
             destination_file_path = os.path.join(destination_dir, destination_file_name)
 
             if not os.path.exists(destination_dir):
                 log.info("Creating folder {}".format(destination_dir))
-                os.mkdir(destination_dir)
+                os.makedirs(destination_dir)
 
             if not os.path.exists(destination_file_path):
                 try:
