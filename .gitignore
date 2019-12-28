@@ -3,4 +3,5 @@
 test/
 input/
 output/
+__pycache__/
 *.log

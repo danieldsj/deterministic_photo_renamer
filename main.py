@@ -21,6 +21,72 @@ formatter = logging.Formatter(
 stdout_handler.setFormatter(formatter)
 log.addHandler(stdout_handler)
 
+
+def get_date(file_path):
+    log.info("Getting EXIF data.")
+    try:
+        image = Image.open(file_path)
+        exif = dict(image.getexif())
+
+        try:
+            return datetime.strptime(exif.get(306), "%Y:%m:%d %H:%M:%S")
+            log.info("Using EXIF DateTime data for file: {}".format(file_path))
+        except TypeError as e:
+            log.warning("Failed to get EXIF DateTime data. Error: {}".format(e))
+
+        try:
+            return datetime.strptime(exif.get(36867), "%Y:%m:%d %H:%M:%S")
+            log.info("Using EXIF DateTimeOriginal data for file: {}".format(file_path))
+        except TypeError as e:
+            log.warning("Failed to get EXIF DateTimeOriginal data. Error: {}".format(e))
+
+        try:
+            return datetime.strptime(exif.get(36868), "%Y:%m:%d %H:%M:%S")
+            log.info("Using EXIF DateTimeDigitized data for file: {}".format(file_path))
+        except TypeError as e:
+            log.warning("Failed to get EXIF DateTimeDigitized data. Error: {}".format(e))
+
+        try:
+            return datetime.fromtimestamp(os.path.getctime(file_path))
+            log.info("Using file creation time for file: {}".format(file_path))
+        except Exception as e:
+            log.error("Failed to get file creation time. Error: {}".format(e))
+            raise e
+
+    except OSError as e:
+        log.warning("The file {} does not appear to be a valid image file.".format(file_path))
+        try:
+            return datetime.fromtimestamp(os.path.getctime(file_path))
+            log.info("Got creation time {} for file: {}".format(file_date, file_path))
+        except Exception as e:
+            log.error("Failed to get file creation time.")
+            raise e
+
+def get_hash(file_path):
+    log.info("Getting a file hash.")
+    hasher = hashlib.sha1()
+    with open(file_path, 'rb') as file_handle:
+        buffer = file_handle.read(65000)
+        while len(buffer) > 0:
+            hasher.update(buffer)
+            buffer = file_handle.read(65000)
+    file_hash = hasher.hexdigest()
+    log.info("Calculated hash of {} for file {}".format(file_hash, file_path))
+    return file_hash
+
+def get_filename(file_date, file_hash, file_extension):
+    return "{}-{}{}".format(file_date.isoformat(), file_hash, file_extension)
+
+def get_dirname(file_date, output_dir):
+    return "{}/{}-{}".format(output_dir, str(file_date.year), str(file_date.month).zfill(2))
+
+def is_directory_valid(directory):
+    log.info('Validating input_dir argument.')
+    if os.path.isdir(directory):
+        return True
+    else:
+        return False
+
 if __name__ == "__main__":
     log.info("Parsing arguments.")
     parser = argparse.ArgumentParser()
@@ -38,92 +104,21 @@ if __name__ == "__main__":
         default=os.environ.get('PHOTOBOMB_OUTPUT_DIR', None),
         type=str)
     arguments = parser.parse_args()
-
-    log.info('Validating input_dir argument.')
-    try:
-        input_dir = arguments.input_dir[0]
-        assert os.path.isdir(input_dir)
-    except AssertionError:
-        log.error('Invalid input_dir value.')
-        exit(1)
-
-    log.info('Validating output_dir argument.')
-    try:
-        output_dir = arguments.output_dir[0]
-        assert os.path.isdir(output_dir)
-    except AssertionError:
-        log.error('Invalid output_dir value.')
-        exit(1)
+    assert os.path.isdir(arguments.input_dir[0])
+    assert os.path.isdir(arguments.output_dir[0])
 
     log.info("Iterating over input directory.")
     for root, directory, files in os.walk(input_dir):
 
         log.info("Processing directory: {}".format(root))
         for f in files:
+            log.info("Processing file: {}".format(file_path))
             file_path = os.path.join(root, f)
             file_extension = os.path.splitext(f)[1]
-            file_date = None
-            file_hash = None
-
-            log.info("Processing file: {}".format(file_path))
-            log.info("Getting EXIF data.")
-            try:
-                image = Image.open(file_path)
-                exif = dict(image.getexif())
-                while True:
-                    try:
-                        file_date = datetime.strptime(exif.get(306), "%Y:%m:%d %H:%M:%S")
-                        log.info(
-                            "Using EXIF DateTime data for file: {}".format(file_path))
-                        break
-                    except TypeError as e:
-                        log.warning("Failed to get EXIF DateTime data. Error: {}".format(e))
-
-                    try:
-                        file_date = datetime.strptime(exif.get(36867), "%Y:%m:%d %H:%M:%S")
-                        log.info("Using EXIF DateTimeOriginal data for file: {}".format(file_path))
-                        break
-                    except TypeError as e:
-                        log.warning("Failed to get EXIF DateTimeOriginal data. Error: {}".format(e))
-
-                    try:
-                        file_date = datetime.strptime(exif.get(36868), "%Y:%m:%d %H:%M:%S")
-                        log.info("Using EXIF DateTimeDigitized data for file: {}".format(file_path))
-                        break
-                    except TypeError as e:
-                        log.warning("Failed to get EXIF DateTimeDigitized data. Error: {}".format(e))
-
-                    try:
-                        file_date = datetime.fromtimestamp(os.path.getctime(file_path))
-                        log.info("Using file creation time for file: {}".format(file_path))
-                        break
-                    except Exception as e:
-                        log.error("Failed to get file creation time. Error: {}".format(e))
-                        raise e
-
-            except OSError as e:
-                log.warning("The file {} does not appear to be a valid image file.".format(file_path))
-                try:
-                    file_date = datetime.fromtimestamp(os.path.getctime(file_path))
-                    log.info("Got creation time {} for file: {}".format(file_date, file_path))
-                except Exception as e:
-                    log.error("Failed to get file creation time.")
-                    raise e
-
-            log.info("Getting a file hash.")
-            hasher = hashlib.sha1()
-            is_duplicate = False
-            with open(file_path, 'rb') as file_handle:
-                buffer = file_handle.read(65000)
-                while len(buffer) > 0:
-                    hasher.update(buffer)
-                    buffer = file_handle.read(65000)
-            file_hash = hasher.hexdigest()
-            log.info("Calculated hash of {} for file {}".format(file_hash, file_path))
-
-            log.info("Generating unique file name.")
-            destination_dir = "{}/{}-{}".format(output_dir, str(file_date.year), str(file_date.month).zfill(2))
-            destination_file_name = "{}-{}{}".format(file_date.isoformat(), file_hash, file_extension)
+            file_date = get_date(file_path)
+            file_hash = get_hash(file_path)
+            destination_dir = get_dirname(file_date, output_dir)
+            destination_file_name = get_filename(file_date, file_hash, file_extension)
             destination_file_path = os.path.join(destination_dir, destination_file_name)
 
             if not os.path.exists(destination_dir):
