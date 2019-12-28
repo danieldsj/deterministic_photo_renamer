@@ -104,16 +104,18 @@ if __name__ == "__main__":
         default=os.environ.get('PHOTOBOMB_OUTPUT_DIR', None),
         type=str)
     arguments = parser.parse_args()
-    assert os.path.isdir(arguments.input_dir[0])
-    assert os.path.isdir(arguments.output_dir[0])
+    input_dir = arguments.input_dir[0]
+    output_dir = arguments.output_dir[0]
+    assert os.path.isdir(input_dir)
+    assert os.path.isdir(output_dir)
 
     log.info("Iterating over input directory.")
     for root, directory, files in os.walk(input_dir):
 
         log.info("Processing directory: {}".format(root))
         for f in files:
-            log.info("Processing file: {}".format(file_path))
             file_path = os.path.join(root, f)
+            log.info("Processing file: {}".format(file_path))
             file_extension = os.path.splitext(f)[1]
             file_date = get_date(file_path)
             file_hash = get_hash(file_path)
