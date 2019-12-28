@@ -2,24 +2,22 @@
 import unittest
 import os
 import main
+import datetime
 
 
 class TestExif(unittest.TestCase):
 
     def test_get_date(self):
         file_date = main.get_date("static/exif.jpg")
-        assert file_date.year == 2008
-        assert file_date.month == 7
-        assert file_date.day == 31
-        assert file_date.hour == 10
-        assert file_date.minute == 38
-        assert file_date.second == 11
+        assert type(file_date) == datetime.datetime
 
     def test_get_dirname(self):
         file_date = main.get_date("static/exif.jpg")
         dirname = main.get_dirname(file_date, "output")
-        assert dirname == "output/2008-07"
-
+        assert dirname == "output/{}-{}".format(
+            str(file_date.year),
+            str(file_date.month).zfill(2)
+            )
 
     def test_get_hash(self):
         file_hash = main.get_hash("static/exif.jpg")
@@ -30,27 +28,26 @@ class TestExif(unittest.TestCase):
         file_date = main.get_date("static/exif.jpg")
         file_hash = main.get_hash("static/exif.jpg")
         file_name = main.get_filename(file_date, file_hash, file_extension)
-        assert file_name == "2008-07-31T10:38:11-c3d98686223ad69ea29c811aaab35d343ff1ae9e.jpg"
+        assert file_name == "{}-{}{}".format(
+            file_date.isoformat(),
+            file_hash,
+            file_extension
+        )
 
 
 class TestNonExif(unittest.TestCase):
 
     def test_get_date(self):
-        
         file_date = main.get_date("static/urandom.jpg")
-        assert file_date.year == 2019
-        assert file_date.month == 12
-        assert file_date.day == 27
-        assert file_date.hour == 23
-        assert file_date.minute == 40
-        assert file_date.second == 47
-
+        assert type(file_date) == datetime.datetime
 
     def test_get_dirname(self):
         file_date = main.get_date("static/urandom.jpg")
         dirname = main.get_dirname(file_date, "output")
-        assert dirname == "output/2019-12"
-
+        assert dirname == "output/{}-{}".format(
+            str(file_date.year),
+            str(file_date.month).zfill(2)
+        )
 
     def test_get_hash(self):
         file_hash = main.get_hash("static/urandom.jpg")
@@ -61,7 +58,11 @@ class TestNonExif(unittest.TestCase):
         file_date = main.get_date("static/urandom.jpg")
         file_hash = main.get_hash("static/urandom.jpg")
         file_name = main.get_filename(file_date, file_hash, file_extension)
-        assert file_name == "2019-12-27T23:40:47.047263-1f95220e253908712fe34bf5ac568e28f403260d.jpg"
+        assert file_name == "{}-{}{}".format(
+            file_date.isoformat(),
+            file_hash,
+            file_extension
+        )
        
 
 if __name__ == "__main__":
