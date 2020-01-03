@@ -57,14 +57,16 @@ def get_date(file_path):
 
     return None
 
+log.info("Getting a file hash.")
 def get_hash(file_path):
-    log.info("Getting a file hash.")
     hasher = hashlib.sha1()
+
     with open(file_path, 'rb') as file_handle:
         buffer = file_handle.read(65000)
         while len(buffer) > 0:
             hasher.update(buffer)
             buffer = file_handle.read(65000)
+
     file_hash = hasher.hexdigest()
     log.info("Calculated hash of {} for file {}".format(file_hash, file_path))
     return file_hash
@@ -121,7 +123,11 @@ if __name__ == "__main__":
             file_extension = os.path.splitext(f)[1].lower()
             modified_date = datetime.fromtimestamp(os.path.getmtime(file_path))
             file_date = get_date(file_path)
-            file_hash = get_hash(file_path)
+            try:
+                file_hash = get_hash(file_path)
+            except OSError as e:
+                log.warning("Failed to generated hash due to error: {}".format(e))
+                continue
             destination_dir = get_dirname(file_date, output_dir, modified_date)
             destination_file_name = get_filename(file_date, file_hash, file_extension, modified_date)
             destination_file_path = os.path.join(destination_dir, destination_file_name)
